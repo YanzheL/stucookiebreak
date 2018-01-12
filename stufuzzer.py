@@ -3,6 +3,7 @@ from threading import Thread, Lock, Event
 
 import requests
 from argparse import ArgumentParser
+import base64
 
 
 class StuFuzzer(object):
@@ -12,7 +13,7 @@ class StuFuzzer(object):
     template_cookie = None
     initialized = Event()
 
-    def __init__(self,template_id, template_pwd):
+    def __init__(self, template_id, template_pwd):
         if not self.initialized.is_set():
             StuFuzzer.template_data = {'stuid': template_id, 'pwd': template_pwd}
             while True:
@@ -66,7 +67,8 @@ class StuFuzzer(object):
     def fuzz(self, target_id, threadnum=4, **composer_args):
         self.initialized.wait()
         composer = self.Composer(self.template_cookie['ACCOUNT'], target_id, self.fuzz_url, **composer_args)
-        processes = [Thread(target=self._worker, kwargs={'composer':composer,'session':requests.Session(),'callback':lambda data:print(data)}) for i in
+        processes = [Thread(target=self._worker, kwargs={'composer': composer, 'session': requests.Session(),
+                                                         'callback': lambda data: print(data)}) for i in
                      range(threadnum)]
         for i in processes:
             i.start()
@@ -86,6 +88,11 @@ class StuFuzzer(object):
 
 def main(args):
     try:
+        try:
+            args.login_pwd = base64.b64decode(args.login_pwd)
+        except Exception:
+            pass
+
         breaker = StuFuzzer(args.login_id, args.login_pwd)
         breaker.fuzz(
             args.target,
