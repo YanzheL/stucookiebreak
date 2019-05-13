@@ -61,7 +61,7 @@ class StuFuzzer(object):
         for req in composer:
             time.sleep(rd.randint(0, self.max_sleep))
             resp = session.send(req)
-            print('Sent')
+            # print('Sent')
             if self.checker(resp):
                 composer.stop = True
                 if callback is not None:
